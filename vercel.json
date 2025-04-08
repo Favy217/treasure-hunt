@@ -1,0 +1,17 @@
+{
+  "rewrites": [
+    {
+      "source": "/discord/(.*)",
+      "destination": "/api/discord.js"
+    },
+    {
+      "source": "/api/chat",
+      "destination": "/chat.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+
