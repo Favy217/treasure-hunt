@@ -6,12 +6,12 @@
       "config": {
         "distDir": "treasure-hunt-frontend/build"
       }
-    }
+    },
   ],
   "routes": [
     {
       "src": "/(.*)",
       "dest": "treasure-hunt-frontend/$1"
-    }
+    },
   ]
 }
