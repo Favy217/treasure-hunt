@@ -1,0 +1,5 @@
+node_modules/
+treasure-hunt-frontend/node_modules/
+packages/node_modules/
+.env
+dist

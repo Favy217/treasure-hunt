@@ -1,0 +1,17 @@
+{
+  "name": "counter-cli",
+  "license": "MIT License",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "ethers": "^6.13.5",
+    "seismic-viem": "^1.0.34"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.11",
+    "typescript": "^5.6.3"
+  }
+}
