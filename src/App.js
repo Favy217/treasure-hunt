@@ -175,6 +175,11 @@ function App() {
     const response = await fetch(`${BACKEND_URL}/discord/${address}`);
     console.log("Response status:", response.status);
     if (!response.ok) {
+      if (response.status === 404) {
+        // Discord ID not found, which is expected if the user hasn't linked Discord
+        console.log("No Discord ID linked for this address, skipping error display.");
+        return; // Exit the function without setting an error message
+      }
       const errorData = await response.json();
       throw new Error(errorData.error || `HTTP ${response.status}`);
     }
