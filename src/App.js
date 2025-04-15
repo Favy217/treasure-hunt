@@ -170,27 +170,27 @@ function App() {
 
   // Fetch Discord ID for a given address
   const fetchDiscordId = async (address) => {
-  try {
-    console.log("Fetching Discord ID for address:", address);
-    const response = await fetch(`${BACKEND_URL}/discord/${address}`);
-    console.log("Response status:", response.status);
-    if (!response.ok) {
-      if (response.status === 404) {
-        // Discord ID not found, which is expected if the user hasn't linked Discord
-        console.log("No Discord ID linked for this address, skipping error display.");
-        return; // Exit the function without setting an error message
+    try {
+      console.log("Fetching Discord ID for address:", address);
+      const response = await fetch(`${BACKEND_URL}/discord/${address}`);
+      console.log("Response status:", response.status);
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Discord ID not found, which is expected if the user hasn't linked Discord
+          console.log("No Discord ID linked for this address, skipping error display.");
+          return; // Exit the function without setting an error message
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
-      const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+      const data = await response.json();
+      console.log("Fetched Discord data:", data);
+      setDiscordLink(prev => ({ ...prev, [address]: data.discordId }));
+    } catch (error) {
+      console.error("Error fetching Discord ID:", error.message);
+      setMessage({ open: true, text: `Failed to fetch Discord ID: ${error.message}`, severity: "error" });
     }
-    const data = await response.json();
-    console.log("Fetched Discord data:", data);
-    setDiscordLink(prev => ({ ...prev, [address]: data.discordId }));
-  } catch (error) {
-    console.error("Error fetching Discord ID:", error.message);
-    setMessage({ open: true, text: `Failed to fetch Discord ID: ${error.message}`, severity: "error" });
-  }
-};
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -389,7 +389,21 @@ function App() {
       setMessage({ open: true, text: "Treasure claimed!", severity: "success" });
     } catch (error) {
       console.error("Claim error:", error);
-      setMessage({ open: true, text: `Transaction failed: ${error.message}`, severity: "error" });
+
+      // Extract the error message for display
+      let errorMessage = "Failed to submit solution";
+      if (error.reason) {
+        // For errors with a 'reason' field 
+        errorMessage = error.reason;
+      } else if (error.data && error.data.message) {
+        // For errors with a 'data.message' field 
+        errorMessage = error.data.message;
+      } else if (error.message.includes("Wrong solution")) {
+        // Fallback: extract the message directly from error.message
+        errorMessage = "Wrong solution";
+      }
+
+      setMessage({ open: true, text: errorMessage, severity: "error" });
     }
   };
 
