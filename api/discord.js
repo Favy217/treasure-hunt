@@ -1,78 +1,79 @@
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
-const cors = require('cors');
+// api/discord.js
+export default async function handler(req, res) {
+  const { path } = req.query; // Vercel uses query parameters for dynamic routes
+  const pathParts = path ? path.split('/') : [];
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+  // Handle /discord/callback
+  if (req.method === 'GET' && pathParts[0] === 'callback') {
+    const { code, state } = req.query;
 
-const CLIENT_ID = process.env.CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = "https://treasure-hunt-frontend-livid.vercel.app/discord/callback";
+    if (!code || !state) {
+      return res.status(400).json({ error: 'Code and state are required' });
+    }
 
-const discordLinks = {};
-const addressByDiscord = {};
+    try {
+      // Exchange code for access token
+      const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: process.env.DISCORD_CLIENT_ID,
+          client_secret: process.env.DISCORD_CLIENT_SECRET,
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: `${process.env.BACKEND_URL}/discord/callback`,
+        }),
+      });
 
-// Handle /discord/callback
-app.get('/discord/callback', async (req, res) => {
-  const { code, state } = req.query;
-  const address = state;
+      const tokenData = await tokenResponse.json();
+      if (!tokenResponse.ok) {
+        throw new Error(tokenData.error || 'Failed to exchange code for token');
+      }
 
-  if (!code || !address) return res.status(400).send("Missing code or state");
+      // Fetch user data
+      const userResponse = await fetch('https://discord.com/api/users/@me', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      });
 
-  try {
-    if (discordLinks[address]) return res.status(403).send("Address already linked");
+      const userData = await userResponse.json();
+      if (!userResponse.ok) {
+        throw new Error(userData.error || 'Failed to fetch user data');
+      }
 
-    const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: REDIRECT_URI,
-    }), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
+      const discordId = userData.username; // Store the username
 
-    const { access_token } = tokenResponse.data;
-    const userResponse = await axios.get('https://discord.com/api/users/@me', {
-      headers: { Authorization: `Bearer ${access_token}` }
-    });
+      // In-memory storage (temporary)
+      global.discordLinks = global.discordLinks || {};
+      global.discordLinks[state] = discordId;
 
-    const discordId = `${userResponse.data.username}#${userResponse.data.discriminator}`;
-    if (addressByDiscord[discordId]) return res.status(403).send("Discord account already linked");
-
-    discordLinks[address] = discordId;
-    addressByDiscord[discordId] = address;
-
-    res.redirect(`https://treasure-hunt-frontend-livid.vercel.app?discord_linked=${encodeURIComponent(discordId)}`);
-  } catch (error) {
-    console.error("Discord auth error:", error);
-    res.status(500).send("Authentication failed");
+      // Redirect back to the frontend
+      res.redirect('/');
+    } catch (error) {
+      console.error('Error in Discord callback:', error);
+      res.status(500).json({ error: 'Failed to link Discord' });
+    }
   }
-});
+  // Handle /discord/${address}
+  else if (req.method === 'GET' && pathParts.length === 1) {
+    const address = pathParts[0];
 
-// Handle /discord/:address
-app.get('/discord/:address', (req, res) => {
-  const { address } = req.params;
-  res.json({ discordId: discordLinks[address] || null });
-});
+    if (!address) {
+      return res.status(400).json({ error: 'Address is required' });
+    }
 
-// Handle /discord/forgive
-app.post('/discord/forgive', (req, res) => {
-  const { address } = req.body;
-  if (!address) return res.status(400).send("Missing address");
-  const discordId = discordLinks[address];
-  if (discordId) {
-    delete discordLinks[address];
-    delete addressByDiscord[discordId];
+    const discordLinks = global.discordLinks || {};
+    const discordId = discordLinks[address];
+
+    if (!discordId) {
+      return res.status(404).json({ error: 'Discord ID not found for this address' });
+    }
+
+    res.status(200).json({ discordId });
+  } else {
+    res.status(405).json({ error: 'Method not allowed' });
   }
-  res.send("User forgiven");
-});
-
-// Fallback for unmatched routes
-app.use((req, res) => {
-  res.status(404).send("Cannot GET " + req.path);
-});
-
-module.exports = app;
+}
