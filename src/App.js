@@ -392,14 +392,14 @@ function App() {
 
       // Extract the error message for display
       let errorMessage = "Failed to submit solution";
-      if (error.reason) {
-        // For errors with a 'reason' field 
-        errorMessage = error.reason;
-      } else if (error.data && error.data.message) {
-        // For errors with a 'data.message' field 
-        errorMessage = error.data.message;
-      } else if (error.message.includes("Wrong solution")) {
-        // Fallback: extract the message directly from error.message
+      if (error.code === "CALL_EXCEPTION" && error.reason === "Wrong solution") {
+        // Direct match for "Wrong solution" in error.reason
+        errorMessage = "Wrong solution";
+      } else if (error.error && error.error.message && error.error.message.includes("Wrong solution")) {
+        // Nested error in error.error.message
+        errorMessage = "Wrong solution";
+      } else if (error.message && error.message.includes("Wrong solution")) {
+        // Fallback: check error.message
         errorMessage = "Wrong solution";
       }
 
