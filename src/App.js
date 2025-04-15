@@ -170,20 +170,22 @@ function App() {
 
   // Fetch Discord ID for a given address
   const fetchDiscordId = async (address) => {
-    try {
-      console.log(`Fetching Discord ID for address: ${address}`);
-      const response = await fetch(`${BACKEND_URL}/discord/${address}`);
-      console.log("Fetch Discord ID response status:", response.status);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      console.log("Fetched Discord ID data:", data);
-      if (data.discordId) {
-        setDiscordLink(prev => ({ ...prev, [address]: data.discordId }));
-      }
-    } catch (error) {
-      console.error("Error fetching Discord ID:", error);
+  try {
+    console.log("Fetching Discord ID for address:", address);
+    const response = await fetch(`${BACKEND_URL}/discord/${address}`);
+    console.log("Response status:", response.status);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP ${response.status}`);
     }
-  };
+    const data = await response.json();
+    console.log("Fetched Discord data:", data);
+    setDiscordLink(prev => ({ ...prev, [address]: data.discordId }));
+  } catch (error) {
+    console.error("Error fetching Discord ID:", error.message);
+    setMessage({ open: true, text: `Failed to fetch Discord ID: ${error.message}`, severity: "error" });
+  }
+};
 
   useEffect(() => {
     const init = async () => {
