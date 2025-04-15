@@ -7,11 +7,20 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && pathParts[0] === 'callback') {
     const { code, state } = req.query;
 
+    console.log('Received callback with:', { code, state });
+
     if (!code || !state) {
+      console.error('Missing code or state');
       return res.status(400).json({ error: 'Code and state are required' });
     }
 
     try {
+      console.log('Environment variables:', {
+        client_id: process.env.DISCORD_CLIENT_ID,
+        client_secret: process.env.DISCORD_CLIENT_SECRET ? '[REDACTED]' : 'undefined',
+        redirect_uri: `${process.env.BACKEND_URL}/discord/callback`,
+      });
+
       // Exchange code for access token
       const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
         method: 'POST',
@@ -28,6 +37,8 @@ export default async function handler(req, res) {
       });
 
       const tokenData = await tokenResponse.json();
+      console.log('Token response:', tokenData);
+
       if (!tokenResponse.ok) {
         throw new Error(tokenData.error || 'Failed to exchange code for token');
       }
@@ -40,11 +51,14 @@ export default async function handler(req, res) {
       });
 
       const userData = await userResponse.json();
+      console.log('User data response:', userData);
+
       if (!userResponse.ok) {
         throw new Error(userData.error || 'Failed to fetch user data');
       }
 
       const discordId = userData.username; // Store the username
+      console.log('Storing Discord ID:', { address: state, discordId });
 
       // In-memory storage (temporary)
       global.discordLinks = global.discordLinks || {};
@@ -53,7 +67,7 @@ export default async function handler(req, res) {
       // Redirect back to the frontend
       res.redirect('/');
     } catch (error) {
-      console.error('Error in Discord callback:', error);
+      console.error('Error in Discord callback:', error.message);
       res.status(500).json({ error: 'Failed to link Discord' });
     }
   }
