@@ -8,6 +8,7 @@ const RPC_URL = "https://node-2.seismicdev.net/rpc";
 const SEISMIC_CHAIN_ID = "5124";
 const DEPLOYER_ADDRESS = "0xCA01CC8979574cF0a719372C9BAa3457E40e68df";
 const BACKEND_URL = "https://treasure-hunt-frontend-livid.vercel.app";
+const CHAT_BACKEND_URL = "https://treasure-hunt-backend-93cc.onrender.com";
 
 const ABI = [
   "function treasureCount() view returns (uint256)",
@@ -147,8 +148,8 @@ function App() {
   // Fetch chat messages from the backend
   const fetchChatMessages = async () => {
     try {
-      console.log("Fetching chat messages from:", `${BACKEND_URL}/api/chat`);
-      const response = await fetch(`${BACKEND_URL}/api/chat`);
+      console.log("Fetching chat messages from:", `${CHAT_BACKEND_URL}/api/chat`);
+      const response = await fetch(`${CHAT_BACKEND_URL}/api/chat`);
       console.log("Response status:", response.status);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const messages = await response.json();
@@ -460,7 +461,7 @@ function App() {
     if (!chatInput.trim()) return;
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/chat`, {
+      const response = await fetch(`${CHAT_BACKEND_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: discordLink[userAddress], text: chatInput }),
