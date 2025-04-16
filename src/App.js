@@ -167,6 +167,10 @@ function App() {
   }, []);
 
   const fetchDiscordId = async (address) => {
+    if (!address) {
+      console.log("No address provided for fetchDiscordId, skipping...");
+      return;
+    }
     try {
       console.log("Fetching Discord ID for address:", address);
       const response = await fetch(`${CHAT_BACKEND_URL}/discord/${address}`);
@@ -181,7 +185,11 @@ function App() {
       }
       const data = await response.json();
       console.log("Fetched Discord data:", data);
-      setDiscordLink(prev => ({ ...prev, [address]: data.discordId }));
+      setDiscordLink(prev => {
+        const newLinks = { ...prev, [address.toLowerCase()]: data.discordId };
+        console.log("Updated discordLink state:", newLinks);
+        return newLinks;
+      });
     } catch (error) {
       console.error("Error fetching Discord ID:", error.message);
       setMessage({ open: true, text: `Failed to fetch Discord ID: ${error.message}`, severity: "error" });
@@ -215,11 +223,18 @@ function App() {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const state = urlParams.get('state');
-            if (code && state && state === address) {
-              console.log("Detected Discord callback with code:", code, "and state:", state);
-              await fetchDiscordId(address);
+            console.log("URL Params - code:", code, "state:", state, "address:", address);
+            if (code && state) {
+              if (state.toLowerCase() === address.toLowerCase()) {
+                console.log("Detected Discord callback with matching state, fetching Discord ID...");
+                await fetchDiscordId(address);
+              } else {
+                console.warn("State does not match address, skipping fetch:", state, address);
+                setMessage({ open: true, text: "Discord callback state mismatch!", severity: "error" });
+              }
               window.history.replaceState({}, document.title, window.location.pathname);
             } else {
+              console.log("No Discord callback detected, checking for existing Discord link...");
               await fetchDiscordId(address);
             }
           }
@@ -278,7 +293,11 @@ function App() {
           }
         }
       }
-      setDiscordLink(prev => ({ ...prev, ...discordIds }));
+      setDiscordLink(prev => {
+        const newLinks = { ...prev, ...discordIds };
+        console.log("Updated discordLink state in leaderboard:", newLinks);
+        return newLinks;
+      });
       setLeaderboard(sorted);
     } catch (e) {
       console.error("Leaderboard fetch error:", e);
@@ -343,7 +362,6 @@ function App() {
       await refreshTreasures(contract);
       await updateLeaderboard(contract);
 
-      // Fetch the Discord ID for the address
       await fetchDiscordId(address);
 
       setMessage({ open: true, text: "Connected, ye pirate!", severity: "success" });
@@ -361,7 +379,6 @@ function App() {
     setTreasuresClaimed(0);
     setUserAddress(null);
     setIsConnected(false);
-    // Do not clear discordLink; let it persist
     setMessage({ open: true, text: "Disconnected, back to shore!", severity: "info" });
   };
 
@@ -399,6 +416,7 @@ function App() {
     if (!isConnected) return setMessage({ open: true, text: "Connect wallet first!", severity: "error" });
     if (discordLink[userAddress]) return setMessage({ open: true, text: "Already linked!", severity: "warning" });
     const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${process.env.REACT_APP_DISCORD_CLIENT_ID || ''}&redirect_uri=${encodeURIComponent(BACKEND_URL + '/discord/callback')}&response_type=code&scope=identify&state=${userAddress}`;
+    console.log("Redirecting to Discord OAuth:", discordAuthUrl);
     window.location.href = discordAuthUrl;
   };
 
@@ -538,14 +556,14 @@ function App() {
             <WoodenButton onClick={() => refreshTreasures(contract)} disabled={!contract} sx={{ ml: 2 }}>
               Refresh Map
             </WoodenButton>
-            {isConnected && !discordLink[userAddress] && (
+            {isConnected && !discordLink[userAddress?.toLowerCase()] && (
               <WoodenButton onClick={linkDiscord} sx={{ ml: 2 }}>
                 Link Discord
               </WoodenButton>
             )}
-            {isConnected && discordLink[userAddress] && (
+            {isConnected && discordLink[userAddress?.toLowerCase()] && (
               <DiscordLabel sx={{ ml: 2 }}>
-                {discordLink[userAddress]}
+                {discordLink[userAddress.toLowerCase()]}
               </DiscordLabel>
             )}
           </Box>
