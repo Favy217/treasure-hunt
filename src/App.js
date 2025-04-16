@@ -223,11 +223,31 @@ function App() {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const state = urlParams.get('state');
-            console.log("URL Params - code:", code, "state:", state, "address:", address);
-            if (code && state) {
+            const error = urlParams.get('error');
+            console.log("URL Params - code:", code, "state:", state, "error:", error, "address:", address);
+            if (error) {
+              console.log("Detected error in Discord callback:", error);
+              const errorDescription = urlParams.get('error_description') || 'Unknown error';
+              setMessage({ open: true, text: `Failed to link Discord: ${errorDescription}`, severity: "error" });
+              window.history.replaceState({}, document.title, window.location.pathname);
+            } else if (code && state) {
               if (state.toLowerCase() === address.toLowerCase()) {
                 console.log("Detected Discord callback with matching state, fetching Discord ID...");
-                await fetchDiscordId(address);
+                const response = await fetch(`${CHAT_BACKEND_URL}/discord/${address}`);
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  if (response.status === 409) {
+                    setMessage({
+                      open: true,
+                      text: `This Discord ID is already linked to another address: ${errorData.existingAddress.slice(0, 6)}...`,
+                      severity: "error"
+                    });
+                  } else {
+                    setMessage({ open: true, text: `Failed to fetch Discord ID: ${errorData.error}`, severity: "error" });
+                  }
+                } else {
+                  await fetchDiscordId(address);
+                }
               } else {
                 console.warn("State does not match address, skipping fetch:", state, address);
                 setMessage({ open: true, text: "Discord callback state mismatch!", severity: "error" });
