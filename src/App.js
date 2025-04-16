@@ -169,7 +169,7 @@ function App() {
   const fetchDiscordId = async (address) => {
     try {
       console.log("Fetching Discord ID for address:", address);
-      const response = await fetch(`${BACKEND_URL}/discord/${address}`);
+      const response = await fetch(`${CHAT_BACKEND_URL}/discord/${address}`);
       console.log("Response status:", response.status);
       if (!response.ok) {
         if (response.status === 404) {
@@ -266,7 +266,7 @@ function App() {
       for (const user of sorted) {
         if (!discordIds[user.address]) {
           try {
-            const response = await fetch(`${BACKEND_URL}/discord/${user.address}`);
+            const response = await fetch(`${CHAT_BACKEND_URL}/discord/${user.address}`);
             if (response.ok) {
               const data = await response.json();
               if (data.discordId) {
@@ -404,8 +404,9 @@ function App() {
 
   const forgiveUser = async (address) => {
     if (!isConnected || userAddress?.toLowerCase() !== DEPLOYER_ADDRESS.toLowerCase()) return setMessage({ open: true, text: "Only deployer can pardon!", severity: "error" });
+    if (!ethers.isAddress(address)) return setMessage({ open: true, text: "Invalid address format!", severity: "error" });
     try {
-      const response = await fetch(`${BACKEND_URL}/discord/forgive`, {
+      const response = await fetch(`${CHAT_BACKEND_URL}/discord/forgive`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address })
@@ -418,10 +419,12 @@ function App() {
         });
         setMessage({ open: true, text: `User ${address} forgiven!`, severity: "success" });
       } else {
-        throw new Error("Failed to forgive user");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to forgive user");
       }
     } catch (error) {
-      setMessage({ open: true, text: `Failed: ${error.message}`, severity: "error" });
+      console.error("Forgive user error:", error);
+      setMessage({ open: true, text: `Failed to forgive: ${error.message}`, severity: "error" });
     }
   };
 
