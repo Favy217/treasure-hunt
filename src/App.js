@@ -415,7 +415,7 @@ function App() {
   const linkDiscord = async () => {
     if (!isConnected) return setMessage({ open: true, text: "Connect wallet first!", severity: "error" });
     if (discordLink[userAddress]) return setMessage({ open: true, text: "Already linked!", severity: "warning" });
-    const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${process.env.REACT_APP_DISCORD_CLIENT_ID || ''}&redirect_uri=${encodeURIComponent(BACKEND_URL + '/discord/callback')}&response_type=code&scope=identify&state=${userAddress}`;
+    const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${process.env.REACT_APP_DISCORD_CLIENT_ID || ''}&redirect_uri=${encodeURIComponent(CHAT_BACKEND_URL + '/discord/callback')}&response_type=code&scope=identify&state=${userAddress}`;
     console.log("Redirecting to Discord OAuth:", discordAuthUrl);
     window.location.href = discordAuthUrl;
   };
