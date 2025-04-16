@@ -7,7 +7,7 @@ const CONTRACT_ADDRESS = "0x7D701429Ae7D761FeF36EAFA6273e7aEE373A82B";
 const RPC_URL = "https://node-2.seismicdev.net/rpc";
 const SEISMIC_CHAIN_ID = "5124";
 const DEPLOYER_ADDRESS = "0xCA01CC8979574cF0a719372C9BAa3457E40e68df";
-const BACKEND_URL = "https://treasure-hunt-frontend-livid.vercel.app";
+const BACKEND_URL = "https://seismichunt.xyz";
 const CHAT_BACKEND_URL = "https://treasure-hunt-backend-93cc.onrender.com";
 
 const ABI = [
@@ -120,6 +120,12 @@ const TreasureChestSpinner = styled(Box)({
   }
 });
 
+// Function to detect if the user is on a mobile device
+const isMobileDevice = () => {
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+  return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+};
+
 function App() {
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
@@ -140,10 +146,17 @@ function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   const [hintUpdates, setHintUpdates] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const itemsPerPage = 20;
+
+  // State to track if the user is on a mobile device
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile device on component mount
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+  }, []);
 
   const fetchChatMessages = async () => {
     try {
@@ -249,7 +262,7 @@ function App() {
                   await fetchDiscordId(address);
                 }
               } else {
-                console.warn("State does not match address, skipping fetch:", state, address);
+                console.log("State does not match address, skipping fetch:", state, address);
                 setMessage({ open: true, text: "Discord callback state mismatch!", severity: "error" });
               }
               window.history.replaceState({}, document.title, window.location.pathname);
@@ -541,17 +554,31 @@ function App() {
     }
   };
 
-  const toggleMute = () => {
-    const audio = document.getElementById("backgroundMusic");
-    if (audio) {
-      audio.muted = !isMuted;
-      setIsMuted(!isMuted);
-    }
-  };
-
   const activeTreasures = treasures.filter(t => !t.isClaimed);
   const claimedTreasures = treasures.filter(t => t.isClaimed);
   const paginatedLeaderboard = leaderboard.slice(page * itemsPerPage, (page + 1) * itemsPerPage);
+
+  // If the user is on a mobile device, show a message instead of the app
+  if (isMobile) {
+    return (
+      <FullScreenBox sx={{ justifyContent: "center", alignItems: "center" }}>
+        <ParchmentPaper elevation={3} sx={{ maxWidth: "90%", textAlign: "center" }}>
+          <GoldTypography variant="h4" gutterBottom>
+            Switch to a Bigger Screen!
+          </GoldTypography>
+          <Typography
+            sx={{
+              fontFamily: "'Pirata One', cursive",
+              color: "#8b4513",
+              fontSize: "1.2rem",
+            }}
+          >
+            This treasure hunt is best experienced on a tablet or desktop. Please switch to a larger screen to join the adventure!
+          </Typography>
+        </ParchmentPaper>
+      </FullScreenBox>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -687,7 +714,6 @@ function App() {
           <audio id="backgroundMusic" src="/audio/Irish_Rovers.mp3" preload="auto" loop />
           <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
             <WoodenButton onClick={togglePlay}>{isPlaying ? "Pause" : "Play"}</WoodenButton>
-            <WoodenButton onClick={toggleMute} sx={{ ml: 1 }}>{isMuted ? "Unmute" : "Mute"}</WoodenButton>
           </Box>
         </ParchmentPaper>
         <ChatBox sx={{ margin: 0 }}>
