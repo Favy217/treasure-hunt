@@ -343,16 +343,8 @@ function App() {
       await refreshTreasures(contract);
       await updateLeaderboard(contract);
 
-      try {
-        const response = await fetch(`${BACKEND_URL}/discord/${address}`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        if (data.discordId) {
-          setDiscordLink(prev => ({ ...prev, [address]: data.discordId }));
-        }
-      } catch (fetchError) {
-        console.error("Discord fetch error:", fetchError);
-      }
+      // Fetch the Discord ID for the address
+      await fetchDiscordId(address);
 
       setMessage({ open: true, text: "Connected, ye pirate!", severity: "success" });
       setIsConnected(true);
@@ -369,7 +361,7 @@ function App() {
     setTreasuresClaimed(0);
     setUserAddress(null);
     setIsConnected(false);
-    setDiscordLink({});
+    // Do not clear discordLink; let it persist
     setMessage({ open: true, text: "Disconnected, back to shore!", severity: "info" });
   };
 
