@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { Button, TextField, Typography, Box, Paper, Snackbar, Alert } from '@mui/material';
+import { Button, TextField, Typography, Box, Paper, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { styled } from '@mui/system';
 
 const CONTRACT_ADDRESS = "0x7D701429Ae7D761FeF36EAFA6273e7aEE373A82B";
@@ -142,10 +142,9 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [hintUpdates, setHintUpdates] = useState({});
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const itemsPerPage = 20;
 
-  // Fetch chat messages from the backend
   const fetchChatMessages = async () => {
     try {
       console.log("Fetching chat messages from:", `${CHAT_BACKEND_URL}/api/chat`);
@@ -161,14 +160,12 @@ function App() {
     }
   };
 
-  // Fetch chat messages on mount and every 10 seconds
   useEffect(() => {
     fetchChatMessages();
     const interval = setInterval(fetchChatMessages, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch Discord ID for a given address
   const fetchDiscordId = async (address) => {
     try {
       console.log("Fetching Discord ID for address:", address);
@@ -176,9 +173,8 @@ function App() {
       console.log("Response status:", response.status);
       if (!response.ok) {
         if (response.status === 404) {
-          // Discord ID not found, which is expected if the user hasn't linked Discord
           console.log("No Discord ID linked for this address, skipping error display.");
-          return; // Exit the function without setting an error message
+          return;
         }
         const errorData = await response.json();
         throw new Error(errorData.error || `HTTP ${response.status}`);
@@ -195,12 +191,11 @@ function App() {
   useEffect(() => {
     const init = async () => {
       try {
+        setIsLoading(true);
         const provider = new ethers.JsonRpcProvider(RPC_URL);
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
         setProvider(provider);
         setContract(contract);
-        await refreshTreasures(contract);
-        await updateLeaderboard(contract);
 
         if (window.ethereum) {
           const web3Provider = new ethers.BrowserProvider(window.ethereum);
@@ -217,7 +212,6 @@ function App() {
             setPoints(points.toString());
             setTreasuresClaimed(treasures.toString());
 
-            // Check for Discord callback in the URL
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const state = urlParams.get('state');
@@ -230,9 +224,16 @@ function App() {
             }
           }
         }
+
+        await Promise.all([
+          refreshTreasures(contract),
+          updateLeaderboard(contract)
+        ]);
       } catch (error) {
         console.error("Initialization error:", error);
         setMessage({ open: true, text: "Failed to initialize—check blockchain or backend!", severity: "error" });
+      } finally {
+        setIsLoading(false);
       }
     };
     init();
@@ -374,6 +375,7 @@ function App() {
 
   const claim = async (id) => {
     if (!signer) return setMessage({ open: true, text: "Connect wallet first!", severity: "error" });
+    if (!discordLink[userAddress]) return setMessage({ open: true, text: "Link Discord first to claim booty!", severity: "error" });
     if (!solutions[id]) return setMessage({ open: true, text: "Enter a solution!", severity: "error" });
 
     try {
@@ -389,20 +391,14 @@ function App() {
       setMessage({ open: true, text: "Treasure claimed!", severity: "success" });
     } catch (error) {
       console.error("Claim error:", error);
-
-      // Extract the error message for display
       let errorMessage = "Failed to submit solution";
       if (error.code === "CALL_EXCEPTION" && error.reason === "Wrong solution") {
-        // Direct match for "Wrong solution" in error.reason
         errorMessage = "Wrong solution";
       } else if (error.error && error.error.message && error.error.message.includes("Wrong solution")) {
-        // Nested error in error.error.message
         errorMessage = "Wrong solution";
       } else if (error.message && error.message.includes("Wrong solution")) {
-        // Fallback: check error.message
         errorMessage = "Wrong solution";
       }
-
       setMessage({ open: true, text: errorMessage, severity: "error" });
     }
   };
@@ -520,181 +516,174 @@ function App() {
     }
   };
 
-  const startGame = () => {
-    setIsFirstLoad(false);
-    setIsPlaying(true);
-    const audio = document.getElementById("backgroundMusic");
-    if (audio) {
-      audio.play().catch(e => console.error("Auto-play error:", e));
-    }
-  };
-
   const activeTreasures = treasures.filter(t => !t.isClaimed);
   const claimedTreasures = treasures.filter(t => t.isClaimed);
   const paginatedLeaderboard = leaderboard.slice(page * itemsPerPage, (page + 1) * itemsPerPage);
 
+  if (isLoading) {
+    return (
+      <FullScreenBox sx={{ justifyContent: "center", alignItems: "center" }}>
+        <CircularProgress sx={{ color: "#ffd700" }} />
+        <GoldTypography variant="h5" sx={{ ml: 2 }}>Loading Treasure Hunt...</GoldTypography>
+      </FullScreenBox>
+    );
+  }
+
   return (
-    <>
-      {isFirstLoad && (
-        <Box sx={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center", alignItems: "center", bgcolor: "rgba(0,0,0,0.5)", zIndex: 9999 }}>
-          <WoodenButton onClick={startGame}>Start Game</WoodenButton>
-        </Box>
-      )}
-      <FullScreenBox>
-        <Box sx={{ flex: 2, height: "100%", overflowY: "auto", margin: 0, padding: 0 }}>
-          <ParchmentPaper elevation={3} sx={{ height: "100%" }}>
-            <GoldTypography variant="h3" align="center" gutterBottom>Treasure Hunt</GoldTypography>
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, alignItems: 'center' }}>
-              {isConnected ? (
-                <WoodenButton onClick={disconnectWallet}>Disconnect Wallet</WoodenButton>
-              ) : (
-                <WoodenButton onClick={connectWallet}>Connect Wallet</WoodenButton>
-              )}
-              <WoodenButton onClick={() => refreshTreasures(contract)} disabled={!contract} sx={{ ml: 2 }}>
-                Refresh Map
-              </WoodenButton>
-              {isConnected && !discordLink[userAddress] && (
-                <WoodenButton onClick={linkDiscord} sx={{ ml: 2 }}>
-                  Link Discord
-                </WoodenButton>
-              )}
-              {isConnected && discordLink[userAddress] && (
-                <DiscordLabel sx={{ ml: 2 }}>
-                  {discordLink[userAddress]}
-                </DiscordLabel>
-              )}
-            </Box>
-            <GoldTypography variant="h5" align="center">Your Points: {points}</GoldTypography>
-            <GoldTypography variant="h5" align="center">Your Booty Claimed: {treasuresClaimed}</GoldTypography>
-            <TreasureChestSpinner />
-            <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Active Treasures</GoldTypography>
-            {activeTreasures.length === 0 ? (
-              <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center", mt: 2 }}>
-                No active treasures to hunt, arr!
-              </Typography>
+    <FullScreenBox>
+      <Box sx={{ flex: 2, height: "100%", overflowY: "auto", margin: 0, padding: 0 }}>
+        <ParchmentPaper elevation={3} sx={{ height: "100%" }}>
+          <GoldTypography variant="h3" align="center" gutterBottom>Treasure Hunt</GoldTypography>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, alignItems: 'center' }}>
+            {isConnected ? (
+              <WoodenButton onClick={disconnectWallet}>Disconnect Wallet</WoodenButton>
             ) : (
-              activeTreasures.map(t => (
-                <Box key={t.id} sx={{ my: 2, p: 2, backgroundColor: "#fff8dc", border: "2px dashed #8b4513", borderRadius: "5px" }}>
-                  <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513" }}>
-                    Treasure #{t.id} | Clue: {t.clueHash?.slice(0, 10)}... | Points: {t.points}
-                  </Typography>
-                  <Box sx={{ mt: 1 }}>
-                    <Typography sx={{ color: "#8b4513" }}>Hint: {t.hint}</Typography>
-                    <TreasureInput
-                      value={solutions[t.id] || ""}
-                      onChange={e => handleSolutionChange(t.id, e.target.value)}
-                      placeholder="Guess the riddle..."
-                      size="small"
-                      sx={{ mr: 1, mt: 1 }}
-                    />
-                    <WoodenButton onClick={() => claim(t.id)}>Claim Booty</WoodenButton>
-                    {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
-                      <>
-                        <TreasureInput
-                          value={hintUpdates[t.id] || ""}
-                          onChange={e => handleHintUpdateChange(t.id, e.target.value)}
-                          placeholder="Update hint..."
-                          size="small"
-                          sx={{ mt: 1, mr: 1 }}
-                        />
-                        <WoodenButton onClick={() => updateHint(t.id)}>Update Hint</WoodenButton>
-                      </>
-                    )}
-                  </Box>
-                </Box>
-              ))
+              <WoodenButton onClick={connectWallet}>Connect Wallet</WoodenButton>
             )}
-            <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Claimed Booty</GoldTypography>
-            {claimedTreasures.map(t => (
+            <WoodenButton onClick={() => refreshTreasures(contract)} disabled={!contract} sx={{ ml: 2 }}>
+              Refresh Map
+            </WoodenButton>
+            {isConnected && !discordLink[userAddress] && (
+              <WoodenButton onClick={linkDiscord} sx={{ ml: 2 }}>
+                Link Discord
+              </WoodenButton>
+            )}
+            {isConnected && discordLink[userAddress] && (
+              <DiscordLabel sx={{ ml: 2 }}>
+                {discordLink[userAddress]}
+              </DiscordLabel>
+            )}
+          </Box>
+          <GoldTypography variant="h5" align="center">Your Points: {points}</GoldTypography>
+          <GoldTypography variant="h5" align="center">Your Booty Claimed: {treasuresClaimed}</GoldTypography>
+          <TreasureChestSpinner />
+          <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Active Treasures</GoldTypography>
+          {activeTreasures.length === 0 ? (
+            <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center", mt: 2 }}>
+              No active treasures to hunt, arr!
+            </Typography>
+          ) : (
+            activeTreasures.map(t => (
               <Box key={t.id} sx={{ my: 2, p: 2, backgroundColor: "#fff8dc", border: "2px dashed #8b4513", borderRadius: "5px" }}>
                 <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513" }}>
-                  Treasure #{t.id} | Claimant: {t.claimant?.slice(0, 6)}... | Points: {t.points}
+                  Treasure #{t.id} | Clue: {t.clueHash?.slice(0, 10)}... | Points: {t.points}
                 </Typography>
-              </Box>
-            ))}
-            {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
-              <Box sx={{ mt: 4 }}>
-                <GoldTypography variant="h5" align="center">Admin: Add New Treasure</GoldTypography>
-                <TreasureInput value={newClue} onChange={e => setNewClue(e.target.value)} placeholder="Enter new clue..." fullWidth sx={{ mb: 2 }} />
-                <TreasureInput value={newPoints} onChange={e => setNewPoints(e.target.value)} placeholder="Enter points..." type="number" fullWidth sx={{ mb: 2 }} />
-                <TreasureInput value={newHint} onChange={e => setNewHint(e.target.value)} placeholder="Enter hint..." fullWidth sx={{ mb: 2 }} />
-                <WoodenButton onClick={addTreasure}>Deploy Treasure</WoodenButton>
-              </Box>
-            )}
-          </ParchmentPaper>
-        </Box>
-        <Box sx={{ flex: 1, flexGrow: 1, display: 'flex', flexDirection: 'column', height: "100%", width: "100%", minWidth: 0, margin: 0, padding: 0 }}>
-          <ParchmentPaper elevation={3} sx={{ flex: "0 1 auto", margin: 0 }}>
-            <GoldTypography variant="h4" align="center" gutterBottom>Leaderboard</GoldTypography>
-            {paginatedLeaderboard.length > 0 ? (
-              <Box>
-                {paginatedLeaderboard.map((user, index) => (
-                  <Box key={user.address} sx={{ mb: 1 }}>
-                    <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center" }}>
-                      #{page * itemsPerPage + index + 1} {discordLink[user.address] || `${user.address?.slice(0, 6)}...`}
-                    </Typography>
-                    <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center" }}>
-                      Points: {user.points}
-                    </Typography>
-                    <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center" }}>
-                      Booty Claimed: {user.treasures}
-                    </Typography>
-                  </Box>
-                ))}
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                  <WoodenButton onClick={() => setPage(page - 1)} disabled={page === 0} sx={{ mr: 1 }}>Previous</WoodenButton>
-                  <WoodenButton onClick={() => setPage(page + 1)} disabled={(page + 1) * itemsPerPage >= leaderboard.length}>Next</WoodenButton>
+                <Box sx={{ mt: 1 }}>
+                  <Typography sx={{ color: "#8b4513" }}>Hint: {t.hint}</Typography>
+                  <TreasureInput
+                    value={solutions[t.id] || ""}
+                    onChange={e => handleSolutionChange(t.id, e.target.value)}
+                    placeholder="Guess the riddle..."
+                    size="small"
+                    sx={{ mr: 1, mt: 1 }}
+                  />
+                  <WoodenButton onClick={() => claim(t.id)}>Claim Booty</WoodenButton>
+                  {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
+                    <>
+                      <TreasureInput
+                        value={hintUpdates[t.id] || ""}
+                        onChange={e => handleHintUpdateChange(t.id, e.target.value)}
+                        placeholder="Update hint..."
+                        size="small"
+                        sx={{ mt: 1, mr: 1 }}
+                      />
+                      <WoodenButton onClick={() => updateHint(t.id)}>Update Hint</WoodenButton>
+                    </>
+                  )}
                 </Box>
               </Box>
-            ) : (
-              <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center" }}>No pirates yet!</Typography>
-            )}
-            {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
-              <Box sx={{ mt: 2 }}>
-                <TreasureInput
-                  placeholder="User address to forgive"
-                  onKeyPress={(e) => e.key === "Enter" && forgiveUser(e.target.value)}
-                  fullWidth
-                />
-                <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", fontSize: "12px", textAlign: "center" }}>
-                  Admin: Enter address to unlink Discord
-                </Typography>
-              </Box>
-            )}
-            <audio id="backgroundMusic" src="/audio/Irish_Rovers.mp3" preload="auto" loop />
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-              <WoodenButton onClick={togglePlay}>{isPlaying ? "Pause" : "Play"}</WoodenButton>
-              <WoodenButton onClick={toggleMute} sx={{ ml: 1 }}>{isMuted ? "Unmute" : "Mute"}</WoodenButton>
+            ))
+          )}
+          <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Claimed Booty</GoldTypography>
+          {claimedTreasures.map(t => (
+            <Box key={t.id} sx={{ my: 2, p: 2, backgroundColor: "#fff8dc", border: "2px dashed #8b4513", borderRadius: "5px" }}>
+              <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513" }}>
+                Treasure #{t.id} | Claimant: {t.claimant?.slice(0, 6)}... | Points: {t.points}
+              </Typography>
             </Box>
-          </ParchmentPaper>
-          <ChatBox sx={{ margin: 0 }}>
-            <GoldTypography variant="h5" align="center">Crew Chat</GoldTypography>
-            <Box sx={{ flex: 1, overflowY: "auto" }}>
-              {chatMessages.map((msg, index) => (
-                <Typography key={index} sx={{ color: "black", fontFamily: "'Pirata One', cursive", padding: "5px 0" }}>
-                  {msg.user}: {msg.text}
-                </Typography>
+          ))}
+          {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
+            <Box sx={{ mt: 4 }}>
+              <GoldTypography variant="h5" align="center">Admin: Add New Treasure</GoldTypography>
+              <TreasureInput value={newClue} onChange={e => setNewClue(e.target.value)} placeholder="Enter new clue..." fullWidth sx={{ mb: 2 }} />
+              <TreasureInput value={newPoints} onChange={e => setNewPoints(e.target.value)} placeholder="Enter points..." type="number" fullWidth sx={{ mb: 2 }} />
+              <TreasureInput value={newHint} onChange={e => setNewHint(e.target.value)} placeholder="Enter hint..." fullWidth sx={{ mb: 2 }} />
+              <WoodenButton onClick={addTreasure}>Deploy Treasure</WoodenButton>
+            </Box>
+          )}
+        </ParchmentPaper>
+      </Box>
+      <Box sx={{ flex: 1, flexGrow: 1, display: 'flex', flexDirection: 'column', height: "100%", width: "100%", minWidth: 0, margin: 0, padding: 0 }}>
+        <ParchmentPaper elevation={3} sx={{ flex: "0 1 auto", margin: 0 }}>
+          <GoldTypography variant="h4" align="center" gutterBottom>Leaderboard</GoldTypography>
+          {paginatedLeaderboard.length > 0 ? (
+            <Box>
+              {paginatedLeaderboard.map((user, index) => (
+                <Box key={user.address} sx={{ mb: 1 }}>
+                  <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center" }}>
+                    #{page * itemsPerPage + index + 1} {discordLink[user.address] || `${user.address?.slice(0, 6)}...`}
+                  </Typography>
+                  <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center" }}>
+                    Points: {user.points}
+                  </Typography>
+                  <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center" }}>
+                    Booty Claimed: {user.treasures}
+                  </Typography>
+                </Box>
               ))}
-            </Box>
-            {isConnected && (
-              <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: "10px" }}>
-                <TreasureInput
-                  value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  placeholder="Send a message..."
-                  fullWidth
-                  onKeyPress={e => e.key === "Enter" && sendChatMessage()}
-                />
-                <WoodenButton onClick={sendChatMessage}>Send</WoodenButton>
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                <WoodenButton onClick={() => setPage(page - 1)} disabled={page === 0} sx={{ mr: 1 }}>Previous</WoodenButton>
+                <WoodenButton onClick={() => setPage(page + 1)} disabled={(page + 1) * itemsPerPage >= leaderboard.length}>Next</WoodenButton>
               </Box>
-            )}
-          </ChatBox>
-        </Box>
-        <Snackbar open={message.open} autoHideDuration={5000} onClose={() => setMessage({ ...message, open: false })} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-          <Alert severity={message.severity} sx={{ width: "100%" }}>{message.text}</Alert>
-        </Snackbar>
-      </FullScreenBox>
-    </>
+            </Box>
+          ) : (
+            <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center" }}>No pirates yet!</Typography>
+          )}
+          {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
+            <Box sx={{ mt: 2 }}>
+              <TreasureInput
+                placeholder="User address to forgive"
+                onKeyPress={(e) => e.key === "Enter" && forgiveUser(e.target.value)}
+                fullWidth
+              />
+              <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", fontSize: "12px", textAlign: "center" }}>
+                Admin: Enter address to unlink Discord
+              </Typography>
+            </Box>
+          )}
+          <audio id="backgroundMusic" src="/audio/Irish_Rovers.mp3" preload="auto" loop />
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+            <WoodenButton onClick={togglePlay}>{isPlaying ? "Pause" : "Play"}</WoodenButton>
+            <WoodenButton onClick={toggleMute} sx={{ ml: 1 }}>{isMuted ? "Unmute" : "Mute"}</WoodenButton>
+          </Box>
+        </ParchmentPaper>
+        <ChatBox sx={{ margin: 0 }}>
+          <GoldTypography variant="h5" align="center">Crew Chat</GoldTypography>
+          <Box sx={{ flex: 1, overflowY: "auto" }}>
+            {chatMessages.map((msg, index) => (
+              <Typography key={index} sx={{ color: "black", fontFamily: "'Pirata One', cursive", padding: "5px 0" }}>
+                {msg.user}: {msg.text}
+              </Typography>
+            ))}
+          </Box>
+          {isConnected && (
+            <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: "10px" }}>
+              <TreasureInput
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                placeholder="Send a message..."
+                fullWidth
+                onKeyPress={e => e.key === "Enter" && sendChatMessage()}
+              />
+              <WoodenButton onClick={sendChatMessage}>Send</WoodenButton>
+            </Box>
+          )}
+        </ChatBox>
+      </Box>
+      <Snackbar open={message.open} autoHideDuration={5000} onClose={() => setMessage({ ...message, open: false })} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+        <Alert severity={message.severity} sx={{ width: "100%" }}>{message.text}</Alert>
+      </Snackbar>
+    </FullScreenBox>
   );
 }
 
