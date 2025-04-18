@@ -168,6 +168,17 @@ function App() {
         updateLeaderboard(contract);
       } else if (data.type === "newChatMessage") {
         setChatMessages(prev => [...prev, data.message]);
+      } else if (data.type === "treasureClaimed") {
+        // Update treasures and leaderboard on all clients
+        setTreasures(prev => prev.map(t => 
+          t.id === data.treasureId ? { ...t, isClaimed: true, claimant: data.claimant } : t
+        ));
+        updateLeaderboard(contract);
+        // If this client is the claimant, update points and treasuresClaimed
+        if (userAddress && data.claimant.toLowerCase() === userAddress.toLowerCase()) {
+          contract.getPoints(userAddress).then(newPoints => setPoints(newPoints.toString()));
+          contract.getTreasuresClaimed(userAddress).then(newTreasures => setTreasuresClaimed(newTreasures.toString()));
+        }
       }
     };
 
@@ -182,7 +193,7 @@ function App() {
     return () => {
       websocket.close();
     };
-  }, [contract]);
+  }, [contract, userAddress]);
 
   // Detect mobile device on component mount
   useEffect(() => {
@@ -468,6 +479,17 @@ function App() {
         return;
       }
 
+      // Simulate the transaction to catch revert reasons early
+      try {
+        const txRequest = await contract.claimTreasure.populateTransaction(id, solutions[id]);
+        await provider.call(txRequest);
+      } catch (simulationError) {
+        if (simulationError.reason?.includes("Wrong solution") || simulationError.message?.includes("Wrong solution")) {
+          throw new Error("Wrong solution");
+        }
+        throw simulationError;
+      }
+
       setMessage({ open: true, text: `Submitting treasure claim #${id}...`, severity: "info" });
       const tx = await contract.claimTreasure(id, solutions[id], { gasLimit: 300000 });
       await tx.wait();
@@ -477,30 +499,26 @@ function App() {
       setTreasuresClaimed(newTreasures.toString());
       setTreasures(prev => prev.map(t => t.id === id ? { ...t, isClaimed: true, claimant: userAddress } : t));
       await updateLeaderboard(contract);
+
+      // Emit WebSocket event for treasure claimed
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "treasureClaimed", treasureId: id, claimant: userAddress }));
+      }
+
       setMessage({ open: true, text: "Treasure claimed!", severity: "success" });
     } catch (error) {
       console.error("Claim error:", error);
       let errorMessage = "Failed to submit solution";
-      if (error.code === "CALL_EXCEPTION" && error.reason) {
-        if (error.reason.includes("Wrong solution")) {
-          errorMessage = "Wrong solution";
-        } else {
-          errorMessage = `Contract error: ${error.reason}`;
-        }
-      } else if (error.error && error.error.message) {
-        if (error.error.message.includes("Wrong solution")) {
-          errorMessage = "Wrong solution";
-        } else {
-          errorMessage = `Contract error: ${error.error.message}`;
-        }
-      } else if (error.message) {
-        if (error.message.includes("Wrong solution")) {
-          errorMessage = "Wrong solution";
-        } else if (error.message.includes("rejected")) {
-          errorMessage = "Transaction rejected by user";
-        } else {
-          errorMessage = `Error: ${error.message}`;
-        }
+      if (error.reason?.includes("Wrong solution") || error.message?.includes("Wrong solution")) {
+        errorMessage = "Wrong solution";
+      } else if (error.code === "CALL_EXCEPTION" && error.reason) {
+        errorMessage = `Contract error: ${error.reason}`;
+      } else if (error.error?.message) {
+        errorMessage = `Contract error: ${error.error.message}`;
+      } else if (error.message?.includes("rejected")) {
+        errorMessage = "Transaction rejected by user";
+      } else {
+        errorMessage = `Error: ${error.message}`;
       }
       setMessage({ open: true, text: errorMessage, severity: "error" });
     }
