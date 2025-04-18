@@ -9,6 +9,7 @@ const SEISMIC_CHAIN_ID = "5124";
 const DEPLOYER_ADDRESS = "0xCA01CC8979574cF0a719372C9BAa3457E40e68df";
 const BACKEND_URL = "https://seismichunt.xyz";
 const CHAT_BACKEND_URL = "https://treasure-hunt-backend-93cc.onrender.com";
+const WEBSOCKET_URL = "wss://treasure-hunt-backend-93cc.onrender.com";
 
 const ABI = [
   "function treasureCount() view returns (uint256)",
@@ -148,10 +149,40 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [hintUpdates, setHintUpdates] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [ws, setWs] = useState(null); // WebSocket state
   const itemsPerPage = 20;
 
-  // State to track if the user is on a mobile device
-  const [isMobile, setIsMobile] = useState(false);
+  // Initialize WebSocket connection
+  useEffect(() => {
+    const websocket = new WebSocket(WEBSOCKET_URL);
+    setWs(websocket);
+
+    websocket.onopen = () => {
+      console.log("WebSocket connected");
+    };
+
+    websocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "userConnected") {
+        updateLeaderboard(contract);
+      } else if (data.type === "newChatMessage") {
+        setChatMessages(prev => [...prev, data.message]);
+      }
+    };
+
+    websocket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    websocket.onclose = () => {
+      console.log("WebSocket disconnected");
+    };
+
+    return () => {
+      websocket.close();
+    };
+  }, [contract]);
 
   // Detect mobile device on component mount
   useEffect(() => {
@@ -175,8 +206,7 @@ function App() {
 
   useEffect(() => {
     fetchChatMessages();
-    const interval = setInterval(fetchChatMessages, 10000);
-    return () => clearInterval(interval);
+    // Removed setInterval; WebSocket will handle real-time updates
   }, []);
 
   const fetchDiscordId = async (address) => {
@@ -188,9 +218,10 @@ function App() {
       console.log("Fetching Discord ID for address:", address);
       const response = await fetch(`${CHAT_BACKEND_URL}/discord/${address}`);
       console.log("Response status:", response.status);
+      console.log("Response headers:", [...response.headers.entries()]);
       if (!response.ok) {
         if (response.status === 404) {
-          console.log("No Discord ID linked for this address, skipping error display.");
+          console.log("No Discord ID linked for this address in backend:", address);
           return;
         }
         const errorData = await response.json();
@@ -395,7 +426,14 @@ function App() {
       await refreshTreasures(contract);
       await updateLeaderboard(contract);
 
+      // Force re-fetch Discord ID
+      console.log("Re-fetching Discord ID after wallet connect for address:", address);
       await fetchDiscordId(address);
+
+      // Emit WebSocket event for user connection
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "userConnected", address }));
+      }
 
       setMessage({ open: true, text: "Connected, ye pirate!", severity: "success" });
       setIsConnected(true);
@@ -421,8 +459,17 @@ function App() {
     if (!solutions[id]) return setMessage({ open: true, text: "Enter a solution!", severity: "error" });
 
     try {
+      // Check the network
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const network = await provider.getNetwork();
+      const currentChainId = network.chainId.toString();
+      if (currentChainId !== SEISMIC_CHAIN_ID) {
+        setMessage({ open: true, text: `Switch to Seismic Chain Devnet (Chain ID: ${SEISMIC_CHAIN_ID}) in your wallet!`, severity: "error" });
+        return;
+      }
+
       setMessage({ open: true, text: `Submitting treasure claim #${id}...`, severity: "info" });
-      const tx = await contract.claimTreasure(id, solutions[id]);
+      const tx = await contract.claimTreasure(id, solutions[id], { gasLimit: 300000 });
       await tx.wait();
       const newPoints = await contract.getPoints(userAddress);
       const newTreasures = await contract.getTreasuresClaimed(userAddress);
@@ -434,12 +481,26 @@ function App() {
     } catch (error) {
       console.error("Claim error:", error);
       let errorMessage = "Failed to submit solution";
-      if (error.code === "CALL_EXCEPTION" && error.reason === "Wrong solution") {
-        errorMessage = "Wrong solution";
-      } else if (error.error && error.error.message && error.error.message.includes("Wrong solution")) {
-        errorMessage = "Wrong solution";
-      } else if (error.message && error.message.includes("Wrong solution")) {
-        errorMessage = "Wrong solution";
+      if (error.code === "CALL_EXCEPTION" && error.reason) {
+        if (error.reason.includes("Wrong solution")) {
+          errorMessage = "Wrong solution";
+        } else {
+          errorMessage = `Contract error: ${error.reason}`;
+        }
+      } else if (error.error && error.error.message) {
+        if (error.error.message.includes("Wrong solution")) {
+          errorMessage = "Wrong solution";
+        } else {
+          errorMessage = `Contract error: ${error.error.message}`;
+        }
+      } else if (error.message) {
+        if (error.message.includes("Wrong solution")) {
+          errorMessage = "Wrong solution";
+        } else if (error.message.includes("rejected")) {
+          errorMessage = "Transaction rejected by user";
+        } else {
+          errorMessage = `Error: ${error.message}`;
+        }
       }
       setMessage({ open: true, text: errorMessage, severity: "error" });
     }
@@ -531,6 +592,10 @@ function App() {
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const newMessage = await response.json();
+      // Emit WebSocket event for new chat message
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "newChatMessage", message: newMessage }));
+      }
       setChatMessages(prev => [...prev, newMessage]);
       setChatInput("");
     } catch (error) {
