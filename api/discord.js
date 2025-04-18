@@ -1,6 +1,6 @@
 // api/discord.js
 export default async function handler(req, res) {
-  const { path } = req.query; // Vercel uses query parameters for dynamic routes
+  const { path } = req.query;
   const pathParts = path ? path.split('/') : [];
 
   // Handle /discord/callback

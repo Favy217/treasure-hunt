@@ -2,7 +2,7 @@
   "name": "treasure-hunt-frontend",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://treasure-hunt-frontend-livid.vercel.app/"
+  "homepage": "https://treasure-hunt-frontend-livid.vercel.app/",
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
