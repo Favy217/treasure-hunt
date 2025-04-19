@@ -34,11 +34,11 @@ const FullScreenBox = styled(Box)({
   backgroundColor: "#deb887",
   backgroundSize: "cover",
   backgroundPosition: "center",
-  overflow: "hidden",
+  overflowY: "auto", // Enable page-level scrolling
   boxSizing: "border-box",
   "@media (max-width: 600px)": {
     flexDirection: "column",
-    overflowY: "auto", // Allow scrolling when in column layout
+    overflowY: "auto", // Ensure scrolling in column layout
   },
 });
 
@@ -136,7 +136,7 @@ function App() {
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [contract, setContract] = useState(null);
-  const [treasures, setTreasures] = useState([]);
+  const [treasures, setTreasures] = useCCSState([]);
   const [points, setPoints] = useState(0);
   const [treasuresClaimed, setTreasuresClaimed] = useState(0);
   const [solutions, setSolutions] = useState({});
@@ -712,8 +712,8 @@ function App() {
 
   return (
     <FullScreenBox>
-      <Box sx={{ flex: 2, height: "100%", margin: 0, padding: 0, display: "flex", flexDirection: "column", minWidth: "300px" }}>
-        <ParchmentPaper elevation={3} sx={{ flex: "1 1 auto", display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <Box sx={{ flex: 2, margin: 0, padding: 0, display: "flex", flexDirection: "column", minWidth: "300px" }}>
+        <ParchmentPaper elevation={3} sx={{ display: "flex", flexDirection: "column" }}>
           <GoldTypography variant="h3" align="center" gutterBottom>Treasure Hunt</GoldTypography>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, alignItems: 'center' }}>
             {isConnected ? (
@@ -740,7 +740,7 @@ function App() {
           <TreasureChestSpinner />
 
           {/* Active Treasures Section */}
-          <Box sx={{ flex: "1 1 auto", overflowY: "auto", minHeight: "400px" }}>
+          <Box>
             <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Active Treasures</GoldTypography>
             {activeTreasures.length === 0 ? (
               <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center", mt: 2 }}>
@@ -826,7 +826,7 @@ function App() {
           </Box>
 
           {/* Claimed Booty Section */}
-          <Box sx={{ flex: "1 1 auto", overflowY: "auto", minHeight: "200px" }}>
+          <Box>
             <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Claimed Booty</GoldTypography>
             {claimedTreasures.length === 0 ? (
               <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center", mt: 2 }}>
@@ -874,7 +874,7 @@ function App() {
 
           {/* Admin Section */}
           {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
-            <Box sx={{ mt: 4, flex: "0 1 auto" }}>
+            <Box sx={{ mt: 4 }}>
               <GoldTypography variant="h5" align="center">Admin: Add New Treasure</GoldTypography>
               <TreasureInput value={newClue} onChange={e => setNewClue(e.target.value)} placeholder="Enter new clue..." fullWidth sx={{ mb: 2 }} />
               <TreasureInput value={newPoints} onChange={e => setNewPoints(e.target.value)} placeholder="Enter points..." type="number" fullWidth sx={{ mb: 2 }} />
