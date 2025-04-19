@@ -3,3 +3,8 @@ treasure-hunt-frontend/node_modules/
 packages/node_modules/
 .env
 dist
+.DS_Store
+packages/.DS_Store
+packages/cli/.DS_Store
+backend/discordMappings.json
+backend/messages.json
