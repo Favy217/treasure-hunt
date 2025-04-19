@@ -136,7 +136,7 @@ function App() {
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [contract, setContract] = useState(null);
-  const [treasures, setTreasures] = useCCSState([]);
+  const [treasures, setTreasures] = useState([]);
   const [points, setPoints] = useState(0);
   const [treasuresClaimed, setTreasuresClaimed] = useState(0);
   const [solutions, setSolutions] = useState({});
