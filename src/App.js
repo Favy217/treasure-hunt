@@ -165,19 +165,33 @@ function App() {
     websocket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "userConnected") {
-        updateLeaderboard(contract);
+        updateLeaderboard(contract).catch(error => {
+          console.error("Error updating leaderboard on userConnected:", error);
+        });
       } else if (data.type === "newChatMessage") {
-        setChatMessages(prev => [...prev, data.message]);
+        setChatMessages(prev => {
+          // Check if the message ID already exists
+          if (prev.some(msg => msg.id === data.message.id)) {
+            return prev; // Skip duplicate
+          }
+          return [...prev, data.message];
+        });
       } else if (data.type === "treasureClaimed") {
         // Update treasures and leaderboard on all clients
         setTreasures(prev => prev.map(t => 
           t.id === data.treasureId ? { ...t, isClaimed: true, claimant: data.claimant } : t
         ));
-        updateLeaderboard(contract);
+        updateLeaderboard(contract).catch(error => {
+          console.error("Error updating leaderboard on treasureClaimed:", error);
+        });
         // If this client is the claimant, update points and treasuresClaimed
         if (userAddress && data.claimant.toLowerCase() === userAddress.toLowerCase()) {
-          contract.getPoints(userAddress).then(newPoints => setPoints(newPoints.toString()));
-          contract.getTreasuresClaimed(userAddress).then(newTreasures => setTreasuresClaimed(newTreasures.toString()));
+          contract.getPoints(userAddress)
+            .then(newPoints => setPoints(newPoints.toString()))
+            .catch(error => console.error("Error fetching points:", error));
+          contract.getTreasuresClaimed(userAddress)
+            .then(newTreasures => setTreasuresClaimed(newTreasures.toString()))
+            .catch(error => console.error("Error fetching treasures claimed:", error));
         }
         // Add a chat message for the claim
         const claimMessage = {
@@ -187,8 +201,12 @@ function App() {
         };
         setChatMessages(prev => [...prev, claimMessage]);
       } else if (data.type === "newTreasureAdded") {
-        // Refresh treasures and add a chat message
-        refreshTreasures(contract);
+        // Refresh treasures with a slight delay to ensure blockchain propagation
+        setTimeout(() => {
+          refreshTreasures(contract).catch(error => {
+            console.error("Error refreshing treasures on newTreasureAdded:", error);
+          });
+        }, 1000); // 1-second delay
         const newTreasureMessage = {
           user: "System",
           text: "A new treasure has been added to the hunt!",
@@ -629,7 +647,7 @@ function App() {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "newChatMessage", message: newMessage }));
       }
-      setChatMessages(prev => [...prev, newMessage]);
+      // Do not add the message locally; wait for WebSocket event
       setChatInput("");
     } catch (error) {
       console.error("Error sending chat message:", error);
@@ -818,8 +836,27 @@ function App() {
           <GoldTypography variant="h5" align="center">Crew Chat</GoldTypography>
           <Box sx={{ flex: 1, overflowY: "auto" }}>
             {chatMessages.map((msg, index) => (
-              <Typography key={index} sx={{ color: "black", fontFamily: "'Pirata One', cursive", padding: "5px 0" }}>
-                {msg.user}: {msg.text}
+              <Typography
+                key={index}
+                sx={{
+                  color: "black",
+                  fontFamily: "'Pirata One', cursive",
+                  padding: "5px 0",
+                  backgroundColor: msg.user === "System" ? "#fff8dc" : "transparent",
+                  borderRadius: msg.user === "System" ? "5px" : "0",
+                }}
+              >
+                <span
+                  style={{
+                    backgroundColor: msg.user === "System" ? "#ffd700" : "#d3d3d3",
+                    padding: "2px 5px",
+                    borderRadius: "3px",
+                    marginRight: "5px",
+                  }}
+                >
+                  {msg.user}
+                </span>
+                {msg.text}
               </Typography>
             ))}
           </Box>
