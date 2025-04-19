@@ -1,18 +1,30 @@
-# Deploy an encrypted contract in <1m
+Treasure Hunt
+ A fun web app where users can hunt for treasures on the Seismic Chain Devnet, claim booty, and chat with the crew.
 
-> Assumes you've completed the installation steps in the [developer testnet guide](https://docs.seismic.systems/appendix/deployments).
+ ## Features
+ - Hunt for treasures using clues and hints.
+ - Claim treasures to earn points.
+ - View a leaderboard of top pirates.
+ - Chat with other players in the Crew Chat.
+ - Admin features for adding new treasures (for deployer only).
 
-Run this from `packages/contract/`:
+ ## Getting Started
+ 1. Clone the repository:
+    ```bash
+    git clone https://github.com/your-username/try-devnet.git
+    cd try-devnet
+    ```
+ 2. Install dependencies for the frontend:
+    ```bash
+    cd treasure-hunt-frontend
+    npm install
+    ```
+ 3. Start the development server:
+    ```bash
+    npm start
+    ```
+ 4. Open `http://localhost:3000` in your browser.
 
-```
-bash script/deploy.sh
-```
+ ## License
+ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Run this from `packages/cli/`:
-
-```
-bun install
-bash script/transact.sh
-```
-
-Done!
