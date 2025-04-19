@@ -8,8 +8,8 @@ const RPC_URL = "https://node-2.seismicdev.net/rpc";
 const SEISMIC_CHAIN_ID = "5124";
 const DEPLOYER_ADDRESS = "0xCA01CC8979574cF0a719372C9BAa3457E40e68df";
 const BACKEND_URL = "https://seismichunt.xyz";
-const CHAT_BACKEND_URL = "https://treasure-hunt-backend-93cc.onrender.com";
-const WEBSOCKET_URL = "wss://treasure-hunt-backend-93cc.onrender.com/";
+const CHAT_BACKEND_URL = process.env.REACT_APP_CHAT_BACKEND_URL;
+const WEBSOCKET_URL = process.env.REACT_APP_WEBSOCKET_URL;
 
 const ABI = [
   "function treasureCount() view returns (uint256)",
@@ -34,11 +34,11 @@ const FullScreenBox = styled(Box)({
   backgroundColor: "#deb887",
   backgroundSize: "cover",
   backgroundPosition: "center",
-  overflowY: "auto", // Enable page-level scrolling
+  overflowY: "auto",
   boxSizing: "border-box",
   "@media (max-width: 600px)": {
     flexDirection: "column",
-    overflowY: "auto", // Ensure scrolling in column layout
+    overflowY: "auto",
   },
 });
 
@@ -126,6 +126,16 @@ const TreasureChestSpinner = styled(Box)({
   }
 });
 
+const FunImage = styled('img')({
+  width: "100%",
+  maxWidth: "150px",
+  height: "auto",
+  borderRadius: "5px",
+  border: "2px solid #8b4513",
+  margin: "5px",
+  objectFit: "contain",
+});
+
 // Function to detect if the user is on a mobile device
 const isMobileDevice = () => {
   const userAgent = navigator.userAgent || navigator.vendor || window.opera;
@@ -155,10 +165,10 @@ function App() {
   const [hintUpdates, setHintUpdates] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  const [ws, setWs] = useState(null); // WebSocket state
+  const [ws, setWs] = useState(null);
   const itemsPerPage = 20;
 
-  // Initialize WebSocket connection
+  // Initialize WebSocket connection (run once on mount)
   useEffect(() => {
     const websocket = new WebSocket(WEBSOCKET_URL);
     setWs(websocket);
@@ -175,21 +185,18 @@ function App() {
         });
       } else if (data.type === "newChatMessage") {
         setChatMessages(prev => {
-          // Check if the message ID already exists
           if (prev.some(msg => msg.id === data.message.id)) {
-            return prev; // Skip duplicate
+            return prev;
           }
           return [...prev, data.message];
         });
       } else if (data.type === "treasureClaimed") {
-        // Update treasures and leaderboard on all clients
         setTreasures(prev => prev.map(t => 
           t.id === data.treasureId ? { ...t, isClaimed: true, claimant: data.claimant } : t
         ));
         updateLeaderboard(contract).catch(error => {
           console.error("Error updating leaderboard on treasureClaimed:", error);
         });
-        // If this client is the claimant, update points and treasuresClaimed
         if (userAddress && data.claimant.toLowerCase() === userAddress.toLowerCase()) {
           contract.getPoints(userAddress)
             .then(newPoints => setPoints(newPoints.toString()))
@@ -198,7 +205,6 @@ function App() {
             .then(newTreasures => setTreasuresClaimed(newTreasures.toString()))
             .catch(error => console.error("Error fetching treasures claimed:", error));
         }
-        // Add a chat message for the claim
         const claimMessage = {
           user: "System",
           text: `${data.discordId} has claimed Treasure #${data.treasureId}!`,
@@ -206,12 +212,11 @@ function App() {
         };
         setChatMessages(prev => [...prev, claimMessage]);
       } else if (data.type === "newTreasureAdded") {
-        // Refresh treasures with a slight delay to ensure blockchain propagation
         setTimeout(() => {
           refreshTreasures(contract).catch(error => {
             console.error("Error refreshing treasures on newTreasureAdded:", error);
           });
-        }, 1000); // 1-second delay
+        }, 1000);
         const newTreasureMessage = {
           user: "System",
           text: "A new treasure has been added to the hunt!",
@@ -232,9 +237,15 @@ function App() {
     return () => {
       websocket.close();
     };
-  }, [contract, userAddress]);
+  }, []); // Empty dependency array to run only once on mount
 
-  // Detect mobile device on component mount
+  // Notify WebSocket server of user connection when userAddress changes
+  useEffect(() => {
+    if (ws && ws.readyState === WebSocket.OPEN && userAddress) {
+      ws.send(JSON.stringify({ type: "userConnected", address: userAddress }));
+    }
+  }, [ws, userAddress]);
+
   useEffect(() => {
     setIsMobile(isMobileDevice());
   }, []);
@@ -256,7 +267,6 @@ function App() {
 
   useEffect(() => {
     fetchChatMessages();
-    // Removed setInterval; WebSocket will handle real-time updates
   }, []);
 
   const fetchDiscordId = async (address) => {
@@ -476,14 +486,8 @@ function App() {
       await refreshTreasures(contract);
       await updateLeaderboard(contract);
 
-      // Force re-fetch Discord ID
       console.log("Re-fetching Discord ID after wallet connect for address:", address);
       await fetchDiscordId(address);
-
-      // Emit WebSocket event for user connection
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "userConnected", address }));
-      }
 
       setMessage({ open: true, text: "Connected, ye pirate!", severity: "success" });
       setIsConnected(true);
@@ -509,7 +513,6 @@ function App() {
     if (!solutions[id]) return setMessage({ open: true, text: "Enter a solution!", severity: "error" });
 
     try {
-      // Check the network
       const provider = new ethers.BrowserProvider(window.ethereum);
       const network = await provider.getNetwork();
       const currentChainId = network.chainId.toString();
@@ -528,7 +531,6 @@ function App() {
       setTreasures(prev => prev.map(t => t.id === id ? { ...t, isClaimed: true, claimant: userAddress } : t));
       await updateLeaderboard(contract);
 
-      // Emit WebSocket event for treasure claimed
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           type: "treasureClaimed",
@@ -559,7 +561,7 @@ function App() {
 
   const linkDiscord = async () => {
     if (!isConnected) return setMessage({ open: true, text: "Connect wallet first!", severity: "error" });
-    if (discordLink[userAddress]) return setMessage({ open: true, text: "Already linked!", severity: "warning" });
+    if (diskcordLink[userAddress]) return setMessage({ open: true, text: "Already linked!", severity: "warning" });
     const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${process.env.REACT_APP_DISCORD_CLIENT_ID || ''}&redirect_uri=${encodeURIComponent(CHAT_BACKEND_URL + '/discord/callback')}&response_type=code&scope=identify&state=${userAddress}`;
     console.log("Redirecting to Discord OAuth:", discordAuthUrl);
     window.location.href = discordAuthUrl;
@@ -608,7 +610,6 @@ function App() {
       setNewHint("");
       setMessage({ open: true, text: `Treasure added with ${pointsValue} points!`, severity: "success" });
 
-      // Emit WebSocket event for new treasure
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "newTreasureAdded" }));
       }
@@ -648,11 +649,9 @@ function App() {
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const newMessage = await response.json();
-      // Emit WebSocket event for new chat message
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "newChatMessage", message: newMessage }));
       }
-      // Do not add the message locally; wait for WebSocket event
       setChatInput("");
     } catch (error) {
       console.error("Error sending chat message:", error);
@@ -679,7 +678,6 @@ function App() {
   const claimedTreasures = treasures.filter(t => t.isClaimed);
   const paginatedLeaderboard = leaderboard.slice(page * itemsPerPage, (page + 1) * itemsPerPage);
 
-  // If the user is on a mobile device, show a message instead of the app
   if (isMobile) {
     return (
       <FullScreenBox sx={{ justifyContent: "center", alignItems: "center" }}>
@@ -739,7 +737,6 @@ function App() {
           <GoldTypography variant="h5" align="center">Your Booty Claimed: {treasuresClaimed}</GoldTypography>
           <TreasureChestSpinner />
 
-          {/* Active Treasures Section */}
           <Box>
             <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Active Treasures</GoldTypography>
             {activeTreasures.length === 0 ? (
@@ -825,7 +822,6 @@ function App() {
             )}
           </Box>
 
-          {/* Claimed Booty Section */}
           <Box>
             <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Claimed Booty</GoldTypography>
             {claimedTreasures.length === 0 ? (
@@ -872,7 +868,6 @@ function App() {
             )}
           </Box>
 
-          {/* Admin Section */}
           {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
             <Box sx={{ mt: 4 }}>
               <GoldTypography variant="h5" align="center">Admin: Add New Treasure</GoldTypography>
@@ -967,6 +962,11 @@ function App() {
               <WoodenButton onClick={sendChatMessage}>Send</WoodenButton>
             </Box>
           )}
+          <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px" }}>
+            <FunImage src="/images/pirate1.png" alt="Pirate 1" />
+            <FunImage src="/images/pirate2.png" alt="Pirate 2" />
+            <FunImage src="/images/treasure-chest.png" alt="Treasure Chest" />
+          </Box>
         </ChatBox>
       </Box>
       <Snackbar open={message.open} autoHideDuration={5000} onClose={() => setMessage({ ...message, open: false })} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
