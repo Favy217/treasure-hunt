@@ -36,6 +36,9 @@ const FullScreenBox = styled(Box)({
   backgroundPosition: "center",
   overflow: "hidden",
   boxSizing: "border-box",
+  "@media (max-width: 900px)": {
+    flexDirection: "column",
+  },
 });
 
 const ParchmentPaper = styled(Paper)({
@@ -47,6 +50,7 @@ const ParchmentPaper = styled(Paper)({
   boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
   width: "100%",
   boxSizing: "border-box",
+  minWidth: "300px",
 });
 
 const WoodenButton = styled(Button)({
@@ -707,8 +711,8 @@ function App() {
 
   return (
     <FullScreenBox>
-      <Box sx={{ flex: 2, height: "100%", overflowY: "auto", margin: 0, padding: 0 }}>
-        <ParchmentPaper elevation={3} sx={{ height: "100%" }}>
+      <Box sx={{ flex: 2, height: "100%", margin: 0, padding: 0, display: "flex", flexDirection: "column" }}>
+        <ParchmentPaper elevation={3} sx={{ flex: "1 1 auto", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <GoldTypography variant="h3" align="center" gutterBottom>Treasure Hunt</GoldTypography>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, alignItems: 'center' }}>
             {isConnected ? (
@@ -733,53 +737,143 @@ function App() {
           <GoldTypography variant="h5" align="center">Your Points: {points}</GoldTypography>
           <GoldTypography variant="h5" align="center">Your Booty Claimed: {treasuresClaimed}</GoldTypography>
           <TreasureChestSpinner />
-          <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Active Treasures</GoldTypography>
-          {activeTreasures.length === 0 ? (
-            <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center", mt: 2 }}>
-              No active treasures to hunt, arr!
-            </Typography>
-          ) : (
-            activeTreasures.map(t => (
-              <Box key={t.id} sx={{ my: 2, p: 2, backgroundColor: "#fff8dc", border: "2px dashed #8b4513", borderRadius: "5px" }}>
-                <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513" }}>
-                  Treasure #{t.id} | Clue: {t.clueHash?.slice(0, 10)}... | Points: {t.points}
-                </Typography>
-                <Box sx={{ mt: 1 }}>
-                  <Typography sx={{ color: "#8b4513" }}>Hint: {t.hint}</Typography>
-                  <TreasureInput
-                    value={solutions[t.id] || ""}
-                    onChange={e => handleSolutionChange(t.id, e.target.value)}
-                    placeholder="Guess the riddle..."
-                    size="small"
-                    sx={{ mr: 1, mt: 1 }}
-                  />
-                  <WoodenButton onClick={() => claim(t.id)}>Claim Booty</WoodenButton>
+
+          {/* Active Treasures Section */}
+          <Box sx={{ flex: "1 1 auto", overflowY: "auto", minHeight: "200px" }}>
+            <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Active Treasures</GoldTypography>
+            {activeTreasures.length === 0 ? (
+              <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center", mt: 2 }}>
+                No active treasures to hunt, arr!
+              </Typography>
+            ) : (
+              activeTreasures.map(t => (
+                <Box
+                  key={t.id}
+                  sx={{
+                    my: 2,
+                    p: 2,
+                    backgroundColor: "#fff8dc",
+                    border: "2px dashed #8b4513",
+                    borderRadius: "5px",
+                  }}
+                >
+                  <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513" }}>
+                    Treasure #{t.id} | Clue: {t.clueHash?.slice(0, 10)}... | Points: {t.points}
+                  </Typography>
+                  <Typography sx={{ color: "#8b4513", mt: 1 }}>Hint: {t.hint}</Typography>
+                  <Box
+                    sx={{
+                      mt: 1,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 1,
+                      alignItems: "center",
+                    }}
+                  >
+                    <TreasureInput
+                      value={solutions[t.id] || ""}
+                      onChange={e => handleSolutionChange(t.id, e.target.value)}
+                      placeholder="Guess the riddle..."
+                      size="small"
+                      sx={{
+                        flex: "1 1 200px",
+                        minWidth: 0,
+                      }}
+                    />
+                    <WoodenButton
+                      onClick={() => claim(t.id)}
+                      sx={{
+                        flex: "0 1 auto",
+                      }}
+                    >
+                      Claim Booty
+                    </WoodenButton>
+                  </Box>
                   {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
-                    <>
+                    <Box
+                      sx={{
+                        mt: 1,
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 1,
+                        alignItems: "center",
+                      }}
+                    >
                       <TreasureInput
                         value={hintUpdates[t.id] || ""}
                         onChange={e => handleHintUpdateChange(t.id, e.target.value)}
                         placeholder="Update hint..."
                         size="small"
-                        sx={{ mt: 1, mr: 1 }}
+                        sx={{
+                          flex: "1 1 200px",
+                          minWidth: 0,
+                        }}
                       />
-                      <WoodenButton onClick={() => updateHint(t.id)}>Update Hint</WoodenButton>
-                    </>
+                      <WoodenButton
+                        onClick={() => updateHint(t.id)}
+                        sx={{
+                          flex: "0 1 auto",
+                        }}
+                      >
+                        Update Hint
+                      </WoodenButton>
+                    </Box>
                   )}
                 </Box>
-              </Box>
-            ))
-          )}
-          <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Claimed Booty</GoldTypography>
-          {claimedTreasures.map(t => (
-            <Box key={t.id} sx={{ my: 2, p: 2, backgroundColor: "#fff8dc", border: "2px dashed #8b4513", borderRadius: "5px" }}>
-              <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513" }}>
-                Treasure #{t.id} | Claimant: {t.claimant?.slice(0, 6)}... | Points: {t.points}
+              ))
+            )}
+          </Box>
+
+          {/* Claimed Booty Section */}
+          <Box sx={{ flex: "1 1 auto", overflowY: "auto", minHeight: "200px" }}>
+            <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Claimed Booty</GoldTypography>
+            {claimedTreasures.length === 0 ? (
+              <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center", mt: 2 }}>
+                No booty claimed yet, arr!
               </Typography>
-            </Box>
-          ))}
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  mt: 2,
+                  pb: 4,
+                }}
+              >
+                {claimedTreasures.map(t => (
+                  <Box
+                    key={t.id}
+                    sx={{
+                      p: 2,
+                      backgroundColor: "#fff8dc",
+                      border: "2px dashed #8b4513",
+                      borderRadius: "5px",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 1,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontFamily: "'Pirata One', cursive",
+                        color: "#8b4513",
+                        flex: "1 1 300px",
+                        minWidth: 0,
+                      }}
+                    >
+                      Treasure #{t.id} | Claimant: {t.claimant?.slice(0, 6)}... | Points: {t.points}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Box>
+
+          {/* Admin Section */}
           {isConnected && userAddress?.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase() && (
-            <Box sx={{ mt: 4 }}>
+            <Box sx={{ mt: 4, flex: "0 1 auto" }}>
               <GoldTypography variant="h5" align="center">Admin: Add New Treasure</GoldTypography>
               <TreasureInput value={newClue} onChange={e => setNewClue(e.target.value)} placeholder="Enter new clue..." fullWidth sx={{ mb: 2 }} />
               <TreasureInput value={newPoints} onChange={e => setNewPoints(e.target.value)} placeholder="Enter points..." type="number" fullWidth sx={{ mb: 2 }} />
