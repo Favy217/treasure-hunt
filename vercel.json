@@ -13,5 +13,16 @@
       "src": "/(.*)",
       "dest": "treasure-hunt-frontend/$1"
     },
+  ],
+  {
+  "headers": [
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.transparenttextures.com data:; connect-src 'self' https://treasure-hunt-backend-93cc.onrender.com wss://treasure-hunt-backend-93cc.onrender.com https://node-2.seismicdev.net https://seismichunt.xyz; font-src 'self'; media-src 'self';"
+        }
+      ]
+    }
   ]
 }
