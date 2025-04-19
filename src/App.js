@@ -36,8 +36,9 @@ const FullScreenBox = styled(Box)({
   backgroundPosition: "center",
   overflow: "hidden",
   boxSizing: "border-box",
-  "@media (max-width: 900px)": {
+  "@media (max-width: 600px)": {
     flexDirection: "column",
+    overflowY: "auto", // Allow scrolling when in column layout
   },
 });
 
@@ -711,7 +712,7 @@ function App() {
 
   return (
     <FullScreenBox>
-      <Box sx={{ flex: 2, height: "100%", margin: 0, padding: 0, display: "flex", flexDirection: "column" }}>
+      <Box sx={{ flex: 2, height: "100%", margin: 0, padding: 0, display: "flex", flexDirection: "column", minWidth: "300px" }}>
         <ParchmentPaper elevation={3} sx={{ flex: "1 1 auto", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <GoldTypography variant="h3" align="center" gutterBottom>Treasure Hunt</GoldTypography>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, alignItems: 'center' }}>
@@ -739,7 +740,7 @@ function App() {
           <TreasureChestSpinner />
 
           {/* Active Treasures Section */}
-          <Box sx={{ flex: "1 1 auto", overflowY: "auto", minHeight: "200px" }}>
+          <Box sx={{ flex: "1 1 auto", overflowY: "auto", minHeight: "400px" }}>
             <GoldTypography variant="h4" align="center" sx={{ mt: 2 }}>Active Treasures</GoldTypography>
             {activeTreasures.length === 0 ? (
               <Typography sx={{ fontFamily: "'Pirata One', cursive", color: "#8b4513", textAlign: "center", mt: 2 }}>
@@ -883,7 +884,7 @@ function App() {
           )}
         </ParchmentPaper>
       </Box>
-      <Box sx={{ flex: 1, flexGrow: 1, display: 'flex', flexDirection: 'column', height: "100%", width: "100%", minWidth: 0, margin: 0, padding: 0 }}>
+      <Box sx={{ flex: 1, flexGrow: 1, display: 'flex', flexDirection: 'column', height: "100%", width: "100%", minWidth: "300px", margin: 0, padding: 0 }}>
         <ParchmentPaper elevation={3} sx={{ flex: "0 1 auto", margin: 0 }}>
           <GoldTypography variant="h4" align="center" gutterBottom>Leaderboard</GoldTypography>
           {paginatedLeaderboard.length > 0 ? (
