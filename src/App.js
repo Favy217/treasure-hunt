@@ -8,8 +8,8 @@ const RPC_URL = "https://node-2.seismicdev.net/rpc";
 const SEISMIC_CHAIN_ID = "5124";
 const DEPLOYER_ADDRESS = "0xCA01CC8979574cF0a719372C9BAa3457E40e68df";
 const BACKEND_URL = "https://seismichunt.xyz";
-const CHAT_BACKEND_URL = process.env.REACT_APP_CHAT_BACKEND_URL;
-const WEBSOCKET_URL = process.env.REACT_APP_WEBSOCKET_URL;
+const CHAT_BACKEND_URL = "https://treasure-hunt-backend-93cc.onrender.com";
+const WEBSOCKET_URL = "wss://treasure-hunt-backend-93cc.onrender.com/";
 
 const ABI = [
   "function treasureCount() view returns (uint256)",
