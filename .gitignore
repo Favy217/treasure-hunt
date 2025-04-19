@@ -8,3 +8,5 @@ packages/.DS_Store
 packages/cli/.DS_Store
 backend/discordMappings.json
 backend/messages.json
+.DS_Store
+.DS_Store
