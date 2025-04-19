@@ -179,6 +179,22 @@ function App() {
           contract.getPoints(userAddress).then(newPoints => setPoints(newPoints.toString()));
           contract.getTreasuresClaimed(userAddress).then(newTreasures => setTreasuresClaimed(newTreasures.toString()));
         }
+        // Add a chat message for the claim
+        const claimMessage = {
+          user: "System",
+          text: `${data.discordId} has claimed Treasure #${data.treasureId}!`,
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...prev, claimMessage]);
+      } else if (data.type === "newTreasureAdded") {
+        // Refresh treasures and add a chat message
+        refreshTreasures(contract);
+        const newTreasureMessage = {
+          user: "System",
+          text: "A new treasure has been added to the hunt!",
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...prev, newTreasureMessage]);
       }
     };
 
@@ -479,17 +495,6 @@ function App() {
         return;
       }
 
-      // Simulate the transaction to catch revert reasons early
-      try {
-        const txRequest = await contract.claimTreasure.populateTransaction(id, solutions[id]);
-        await provider.call(txRequest);
-      } catch (simulationError) {
-        if (simulationError.reason?.includes("Wrong solution") || simulationError.message?.includes("Wrong solution")) {
-          throw new Error("Wrong solution");
-        }
-        throw simulationError;
-      }
-
       setMessage({ open: true, text: `Submitting treasure claim #${id}...`, severity: "info" });
       const tx = await contract.claimTreasure(id, solutions[id], { gasLimit: 300000 });
       await tx.wait();
@@ -502,14 +507,19 @@ function App() {
 
       // Emit WebSocket event for treasure claimed
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "treasureClaimed", treasureId: id, claimant: userAddress }));
+        ws.send(JSON.stringify({
+          type: "treasureClaimed",
+          treasureId: id,
+          claimant: userAddress,
+          discordId: discordLink[userAddress]
+        }));
       }
 
       setMessage({ open: true, text: "Treasure claimed!", severity: "success" });
     } catch (error) {
       console.error("Claim error:", error);
       let errorMessage = "Failed to submit solution";
-      if (error.reason?.includes("Wrong solution") || error.message?.includes("Wrong solution")) {
+      if (error.message?.includes("Wrong solution") || error.reason?.includes("Wrong solution") || error.error?.message?.includes("Wrong solution")) {
         errorMessage = "Wrong solution";
       } else if (error.code === "CALL_EXCEPTION" && error.reason) {
         errorMessage = `Contract error: ${error.reason}`;
@@ -574,6 +584,11 @@ function App() {
       setNewPoints("");
       setNewHint("");
       setMessage({ open: true, text: `Treasure added with ${pointsValue} points!`, severity: "success" });
+
+      // Emit WebSocket event for new treasure
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "newTreasureAdded" }));
+      }
     } catch (error) {
       console.error("Add treasure error:", error);
       setMessage({ open: true, text: `Failed: ${error.message}`, severity: "error" });
